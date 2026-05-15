@@ -5,11 +5,6 @@ import plotly.graph_objects as go
 import numpy as np
 import report_generator
 
-# --- REPORT HELPER ---
-@st.cache_data(show_spinner=False)
-def generate_cached_report(title, desc, _figures, dataframe=None):
-    return report_generator.generate_pdf(title, desc, _figures, dataframe)
-
 # --- PAGE CONFIGURATION ---
 st.set_page_config(page_title="Global Data Dashboard", layout="wide")
 st.title("Global Socio-Economic & Microfinance Dashboard")
@@ -17,46 +12,28 @@ st.title("Global Socio-Economic & Microfinance Dashboard")
 # --- DATA LOADING & CLEANING ---
 @st.cache_data
 def load_data():
-    # Load datasets
     df_country = pd.read_csv('country_profile_variables.csv')
     df_kiva = pd.read_csv('kiva_country_profile_variables.csv')
     
-    # Clean '-99' and '...' which represent missing values, and '~0.0' for near zero
-    for df in [df_country, df_kiva]:
-        df.replace({'-99': np.nan, -99: np.nan, '...': np.nan}, inplace=True)
-        df.replace({'~0.0': 0.0, '~0': 0, '-~0.0': 0.0}, inplace=True)
-        
-    # Ensure key columns used in plots are numeric
-    numeric_cols = [
-        'GDP growth rate (annual %, const. 2005 prices)',
-        'Health: Total expenditure (% of GDP)',
-        'Education: Government expenditure (% of GDP)',
-        'Individuals using the Internet (per 100 inhabitants)',
-        'Mobile-cellular subscriptions (per 100 inhabitants)',
-        'GDP per capita (current US$)',
-        'Employment: Agriculture (% of employed)',
-        'Unemployment (% of labour force)',
-        'Economy: Agriculture (% of GVA)',
-        'Economy: Industry (% of GVA)',
-        'Economy: Services and other activity (% of GVA)'
-    ]
+    # Clean '-99' which represent missing values
+    df_country = df_country.replace([-99, '-99', -99.0], np.nan)
+    df_kiva = df_kiva.replace([-99, '-99', -99.0], np.nan)
     
-    for col in numeric_cols:
-        if col in df_country.columns:
-            df_country[col] = pd.to_numeric(df_country[col], errors='coerce')
-        if col in df_kiva.columns:
-            df_kiva[col] = pd.to_numeric(df_kiva[col], errors='coerce')
-            
     return df_country, df_kiva
 
 df_country, df_kiva = load_data()
 
-# Clean up column names for easier access (optional but recommended)
+# Column Variables
 gdp_col = 'GDP growth rate (annual %, const. 2005 prices)'
 health_col = 'Health: Total expenditure (% of GDP)'
 edu_col = 'Education: Government expenditure (% of GDP)'
 internet_col = 'Individuals using the Internet (per 100 inhabitants)'
 mobile_col = 'Mobile-cellular subscriptions (per 100 inhabitants)'
+
+# --- REPORT HELPER ---
+@st.cache_data(show_spinner=False)
+def generate_cached_report(title, desc, _figures, dataframe=None):
+    return report_generator.generate_pdf(title, desc, _figures, dataframe)
 
 # --- SIDEBAR FOR NAVIGATION ---
 st.sidebar.title("Navigation")
@@ -68,7 +45,7 @@ page = st.sidebar.radio("Select a View:",
 # ==========================================
 if page == "Socio-Economic Correlations":
     st.header("1. Health & Education vs. GDP")
-    st.write("Explore how government spending on health and education correlates with GDP growth.")
+    st.write("Explore how government spending correlates with GDP growth.")
     
     col1, col2 = st.columns(2)
     with col1:
@@ -76,45 +53,74 @@ if page == "Socio-Economic Correlations":
     with col2:
         y_axis = st.selectbox("Select Y-Axis", [gdp_col, 'GDP per capita (current US$)'])
         
-    # Drop NaNs for a clean plot
     plot_data = df_country.dropna(subset=[x_axis, y_axis])
     
+    # Styled Scatter Plot
     fig = px.scatter(
         plot_data, x=x_axis, y=y_axis, 
         hover_name="country", color="Region",
-        trendline="ols", # Adds a line of best fit
+        color_discrete_sequence=px.colors.qualitative.Bold,
+        trendline="ols", 
+        template="plotly_white",
         title=f"Correlation: {x_axis} vs {y_axis}"
     )
+    
+    # Thicken markers and trendline for better visibility
+    fig.update_traces(
+        marker=dict(size=10, line=dict(width=1, color='DarkSlateGrey')),
+        selector=dict(mode='markers')
+    )
+    fig.update_traces(
+        line=dict(dash="dash", width=2, color="black"),
+        selector=dict(mode='lines')
+    )
+    
     st.plotly_chart(fig, use_container_width=True)
 
-    # --- REPORT GENERATION ---
+    st.markdown("---")
+    st.subheader("Correlation Heatmap")
+    
+    # Styled Heatmap
+    metrics = [gdp_col, health_col, edu_col, internet_col, 'Life expectancy at birth (females/males, years)']
+    numeric_df = df_country[metrics].apply(pd.to_numeric, errors='coerce')
+    corr_matrix = numeric_df.corr()
+    
+    fig_corr = px.imshow(
+        corr_matrix, text_auto=".2f", aspect="auto",
+        color_continuous_scale="RdBu_r", zmin=-1, zmax=1,
+        template="plotly_white", title="Socio-Economic Correlation Matrix"
+    )
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+    # PDF Report Generation Button
     st.markdown("---")
     st.subheader("Export Findings")
-    global_corr = plot_data[x_axis].corr(plot_data[y_axis])
-    desc = [
-        f"Analysis of {x_axis} vs {y_axis}.",
-        f"Global Correlation (Pearson): {global_corr:.3f}",
-        "The chart below shows the trendline across different regions."
-    ]
-    with st.spinner("Preparing Report..."):
-        pdf_bytes = generate_cached_report("Socio-Economic Correlations Report", desc, [fig])
-    st.download_button(label="📄 Download PDF Report", data=pdf_bytes, file_name="socio_economic_report.pdf", mime="application/pdf")
+    if st.button("Generate PDF Report"):
+        with st.spinner("Preparing Report... This takes a few seconds..."):
+            desc = [
+                f"This report explores the relationship between {x_axis} and {y_axis}.",
+                "The correlation matrix highlights how macro-indicators interact globally."
+            ]
+            pdf_bytes = generate_cached_report("Socio-Economic Report", desc, [fig, fig_corr])
+            
+            st.download_button(
+                label="📄 Download PDF Report", 
+                data=pdf_bytes, 
+                file_name="socio_economic_report.pdf", 
+                mime="application/pdf"
+            )
 
 # ==========================================
-# PAGE 2: MICROFINANCE IMPACT (Kiva Data)
+# PAGE 2: MICROFINANCE IMPACT
 # ==========================================
 elif page == "Microfinance Impact":
     st.header("2. Technology Access and Microfinance")
-    st.write("Does higher internet or mobile penetration correlate with Kiva metrics? (Using Kiva Country Profiles)")
-    
-    # We use df_kiva here. Since Kiva country profiles contain the same base columns 
-    # as the UN dataset in this specific file, we will plot technology vs. a chosen economic metric.
+    st.write("Explore how internet or mobile penetration correlates with employment metrics.")
     
     col1, col2 = st.columns(2)
     with col1:
         tech_metric = st.selectbox("Select Tech Metric", [internet_col, mobile_col])
     with col2:
-        # Example metric: Unemployment or Employment in Agriculture (often a target for Kiva)
         impact_metric = st.selectbox("Select Impact Metric", 
             ['Employment: Agriculture (% of employed)', 'Unemployment (% of labour force)'])
             
@@ -123,21 +129,13 @@ elif page == "Microfinance Impact":
     fig2 = px.scatter(
         plot_data_kiva, x=tech_metric, y=impact_metric,
         hover_name="country", size="Population in thousands (2017)",
-        color="Region",
+        color="Region", color_discrete_sequence=px.colors.qualitative.Prism,
+        template="plotly_white",
         title=f"Kiva Countries: {tech_metric} vs {impact_metric}"
     )
+    fig2.update_traces(marker=dict(line=dict(width=1, color='DarkSlateGrey')))
+    
     st.plotly_chart(fig2, use_container_width=True)
-
-    # --- REPORT GENERATION ---
-    st.markdown("---")
-    st.subheader("Export Findings")
-    desc = [
-        "Analysis of Microfinance Impact.",
-        f"Comparing '{tech_metric}' vs '{impact_metric}' across Kiva countries."
-    ]
-    with st.spinner("Preparing Report..."):
-        pdf_bytes = generate_cached_report("Microfinance Impact Report", desc, [fig2])
-    st.download_button(label="📄 Download PDF Report", data=pdf_bytes, file_name="microfinance_impact_report.pdf", mime="application/pdf")
 
 # ==========================================
 # PAGE 3: COUNTRY COMPARISON
@@ -151,15 +149,12 @@ elif page == "Country Comparison":
     with col1:
         country1 = st.selectbox("Select Country 1", countries, index=0)
     with col2:
-        country2 = st.selectbox("Select Country 2", countries, index=1)
+        country2 = st.selectbox("Select Country 2", countries, index=min(1, len(countries)-1))
         
-    # Filter data for selected countries
     c1_data = df_country[df_country['country'] == country1].iloc[0]
     c2_data = df_country[df_country['country'] == country2].iloc[0]
     
-    # Display comparison metrics
     st.subheader("Key Metrics Comparison")
-    
     metrics_to_compare = [
         'GDP per capita (current US$)',
         'Life expectancy at birth (females/males, years)',
@@ -167,44 +162,19 @@ elif page == "Country Comparison":
         'Unemployment (% of labour force)'
     ]
     
-    # Create an elegant table/dataframe for comparison
     comp_df = pd.DataFrame({
         "Metric": metrics_to_compare,
         country1: [c1_data[m] for m in metrics_to_compare],
         country2: [c2_data[m] for m in metrics_to_compare]
     })
-    
     st.table(comp_df.set_index("Metric"))
     
-    # Radar Chart for Economy Breakdown
     st.subheader("Economy Structure Comparison")
     categories = ['Economy: Agriculture (% of GVA)', 'Economy: Industry (% of GVA)', 'Economy: Services and other activity (% of GVA)']
     
     fig_radar = go.Figure()
-    fig_radar.add_trace(go.Scatterpolar(
-        r=[c1_data[cat] for cat in categories],
-        theta=['Agriculture', 'Industry', 'Services'],
-        fill='toself',
-        name=country1
-    ))
-    fig_radar.add_trace(go.Scatterpolar(
-        r=[c2_data[cat] for cat in categories],
-        theta=['Agriculture', 'Industry', 'Services'],
-        fill='toself',
-        name=country2
-    ))
+    fig_radar.add_trace(go.Scatterpolar(r=[c1_data[cat] for cat in categories], theta=['Agriculture', 'Industry', 'Services'], fill='toself', name=country1))
+    fig_radar.add_trace(go.Scatterpolar(r=[c2_data[cat] for cat in categories], theta=['Agriculture', 'Industry', 'Services'], fill='toself', name=country2))
     
-    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=True)
-    st.plotly_chart(fig_radar)
-
-    # --- REPORT GENERATION ---
-    st.markdown("---")
-    st.subheader("Export Findings")
-    desc = [
-        f"Country Comparison between {country1} and {country2}.",
-        "The table provides key metrics comparison, and the radar chart shows the breakdown of the economy structure."
-    ]
-    with st.spinner("Preparing Report..."):
-        # comp_df.set_index("Metric") gives a nice df where Metric is the index
-        pdf_bytes = generate_cached_report("Country Comparison Report", desc, [fig_radar], dataframe=comp_df.set_index("Metric"))
-    st.download_button(label="📄 Download PDF Report", data=pdf_bytes, file_name="country_comparison_report.pdf", mime="application/pdf")
+    fig_radar.update_layout(polar=dict(radialaxis=dict(visible=True)), showlegend=True, template="plotly_white")
+    st.plotly_chart(fig_radar, use_container_width=True)
