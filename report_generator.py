@@ -23,11 +23,6 @@ class PDFReport(FPDF):
 def generate_pdf(title, descriptions, figures, dataframe=None):
     """
     Generates a PDF report with color styling.
-    :param title: str
-    :param descriptions: list of str
-    :param figures: list of plotly go.Figure
-    :param dataframe: pd.DataFrame (optional)
-    :return: bytes
     """
     pdf = PDFReport()
     pdf.add_page()
@@ -56,6 +51,7 @@ def generate_pdf(title, descriptions, figures, dataframe=None):
         for i, fig in enumerate(figures):
             temp_img_path = tempfile.mktemp(suffix=".png")
             temp_files.append(temp_img_path)
+            
             # Save plotly figure as PNG
             fig.write_image(temp_img_path, format="png", width=800, height=500)
             
@@ -81,11 +77,9 @@ def generate_pdf(title, descriptions, figures, dataframe=None):
             pdf.set_text_color(0, 0, 0)  # Reset to black
             pdf.ln(2)
             
-            # Reset index to include it in columns if it's meaningful, but for our app it is "Metric"
             df_to_print = dataframe.reset_index()
             columns = [str(c) for c in df_to_print.columns]
             
-            # Calculate cell widths simply
             col_width = pdf.w / len(columns) * 0.85
             row_height = pdf.font_size * 2.5
             
@@ -101,7 +95,6 @@ def generate_pdf(title, descriptions, figures, dataframe=None):
             # Body with alternating row colors
             pdf.set_font('Arial', '', 8)
             for row_idx, (_, row) in enumerate(df_to_print.iterrows()):
-                # Alternate row colors
                 if row_idx % 2 == 0:
                     pdf.set_fill_color(245, 245, 245)  # Light gray
                 else:
