@@ -95,13 +95,13 @@ Because this app converts interactive Plotly charts into static PNGs for the PDF
 
 ### 1. The Core Infrastructure
 
-* **Streamlit Framework:** We used Streamlit to handle the entire frontend. It creates the webpage, the sidebar navigation, and the layout without needing to write any HTML or CSS.
-* **Smart Data Loading:** We used the `@st.cache_data` decorator. This means the app only reads and cleans the heavy CSV files once when it boots up, making the dashboard lightning-fast as the user clicks around.
-* **Automated Data Cleaning:** We wrote logic to instantly find all the `-99` values (which represent missing data in the UN datasets) and convert them to `NaN` so they don't ruin your statistical calculations.
+* **Streamlit Framework:** I used Streamlit to handle the entire frontend. It creates the webpage, the sidebar navigation, and the layout without needing to write any HTML or CSS.
+* **Smart Data Loading:** I used the `@st.cache_data` decorator. This means the app only reads and cleans the heavy CSV files once when it boots up, making the dashboard lightning-fast as the user clicks around.
+* **Automated Data Cleaning:** I wrote logic to instantly find all the `-99` values (which represent missing data in the UN datasets) and convert them to `NaN` so they don't ruin your statistical calculations.
 
 ### 2. Three Interactive Modules
 
-We split the app into three distinct "pages" using a sidebar menu to answer your specific research questions:
+I split the app into three distinct "pages" using a sidebar menu to answer your specific research questions:
 
 * **Socio-Economic Correlations:** Allows users to pick specific health/education metrics and plot them against GDP. We added an OLS (Ordinary Least Squares) trendline to show statistical relationships, and a beautifully styled Red-to-Blue **Correlation Heatmap** to show how all macro-indicators interact at once.
 * **Microfinance Impact:** Focuses on the Kiva dataset, allowing users to see how technological infrastructure (like internet and mobile access) correlates with regional employment metrics—key indicators for microfinance success.
@@ -111,9 +111,9 @@ We split the app into three distinct "pages" using a sidebar menu to answer your
 
 Instead of default charts, we upgraded the visuals to impress your professors:
 
-* We used `template="plotly_white"` to remove the ugly gray backgrounds.
-* We applied professional color palettes (`px.colors.qualitative.Bold` and `Prism`) to easily distinguish different global regions.
-* We thickened the markers and trendlines so they look sharp and authoritative.
+* I used `template="plotly_white"` to remove the ugly gray backgrounds.
+* I applied professional color palettes (`px.colors.qualitative.Bold` and `Prism`) to easily distinguish different global regions.
+* I thickened the markers and trendlines so they look sharp and authoritative.
 
 ### 4. The PDF Export Engine
 
@@ -123,4 +123,3 @@ This is the most advanced feature of the app. We built a bridge between the inte
 * It passes those images, along with the current data state, to your custom `report_generator.py` script.
 * That script dynamically builds a styled PDF with headers, footers, and alternating-color data tables, then hands it back to the web app for the user to download.
 
-**In short:** You started with raw, messy tabular data and ended up with an interactive, beautifully styled, statistically rigorous application that can automatically write its own reports!
