@@ -67,7 +67,7 @@ streamlit run app.py
 
 ```
 
-*The app will automatically open in your default web browser at 'https://country-stats.streamlit.app/'.*
+*The app will automatically open in your default web browser at 'http://localhost:8501'.*
 
 ## ☁️ Deployment on Streamlit Community Cloud
 
